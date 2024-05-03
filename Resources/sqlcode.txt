@@ -1,0 +1,161 @@
+-- Create Database
+CREATE DATABASE energyxchange_db;
+
+-- Utilizing the database
+USE energyxchange_db;
+
+-- Table: Users
+CREATE TABLE Users (
+    UserID INT PRIMARY KEY AUTO_INCREMENT,
+    FirstName VARCHAR(50) NOT NULL,
+    MiddleName VARCHAR(50),
+    LastName VARCHAR(50) NOT NULL,
+    Email VARCHAR(100) NOT NULL UNIQUE,
+    Password VARCHAR(255) NOT NULL,
+    ProfilePicture VARCHAR(255),
+    UserLevel ENUM('admin', 'member') DEFAULT 'member',
+    EmailVerified BOOLEAN DEFAULT TRUE, 
+    VerificationToken VARCHAR(255),
+    SponsorID INT,
+    JoinDate DATETIME DEFAULT CURRENT_TIMESTAMP
+    -- FOREIGN KEY (SponsorID) REFERENCES Users(UserID) ON DELETE CASCADE
+);
+
+-- Table: Products
+CREATE TABLE Products (
+    ProductID INT PRIMARY KEY AUTO_INCREMENT,
+    ProductName VARCHAR(100) NOT NULL,
+    ProductPicture VARCHAR(255),
+    Quantity DECIMAL(10,2) NOT NULL,
+    UnitOfMeasure VARCHAR(5) NOT NULL,
+    Description TEXT,
+    CostPrice DECIMAL(10, 2) NOT NULL,
+    SellingPrice DECIMAL(10, 2) NOT NULL,
+    TotalSellingPrice DECIMAL(10, 2) NOT NULL,
+    QuantityBalance DECIMAL(10, 2) NOT NULL,
+    Category ENUM('oil', 'gas') DEFAULT 'oil',
+    CreationDate DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table: Orders
+CREATE TABLE Orders (
+    OrderID INT PRIMARY KEY AUTO_INCREMENT,
+    UserID INT,
+    LocationID INT,
+    UniqueOrderID INT,
+    OrderDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    TotalAmount DECIMAL(10, 2) NOT NULL,
+    TotalProfit DECIMAL(10, 2) NOT NULL
+    -- FOREIGN KEY (UserID) REFERENCES Users(UserID) ON DELETE CASCADE,
+    -- FOREIGN KEY (LocationID) REFERENCES DeliveryLocations(LocationID) ON DELETE CASCADE
+);
+
+-- Table: OrderDetails
+CREATE TABLE OrderDetails (
+    OrderDetailID INT PRIMARY KEY AUTO_INCREMENT,
+    OrderID INT,
+    ProductID INT,
+    UniqueOrderID INT,
+    Quantity DECIMAL(10, 2) NOT NULL,
+    SellingPrice DECIMAL(10, 2) NOT NULL,
+    Subtotal DECIMAL(10, 2) NOT NULL,
+    Profit DECIMAL(10, 2) NOT NULL,
+    orderStatus VARCHAR(20) NOT NULL
+    -- PRIMARY KEY (OrderID, ProductID)
+    -- FOREIGN KEY (OrderID) REFERENCES Orders(OrderID) ON DELETE CASCADE,
+    -- FOREIGN KEY (ProductID) REFERENCES Products(ProductID) ON DELETE CASCADE
+);
+
+-- Table: DeliveryLocations
+CREATE TABLE DeliveryLocations (
+    LocationID INT PRIMARY KEY AUTO_INCREMENT,
+    UserID INT,
+    CompanyName VARCHAR(255) NOT NULL,
+    Address VARCHAR(255) NOT NULL,
+    City VARCHAR(100) NOT NULL,
+    State VARCHAR(100) NOT NULL,
+    Country VARCHAR(100) NOT NULL,
+    PostalCode VARCHAR(20) NOT NULL,
+    ContactName VARCHAR(255) NOT NULL,
+    ContactNumber VARCHAR(25) NOT NULL,
+    FOREIGN KEY (UserID) REFERENCES Users(UserID) ON DELETE CASCADE
+);
+
+-- Table: MLMStructure
+CREATE TABLE MLMStructure (
+    UserID INT,
+    SponsorID INT,
+    Level INT NOT NULL,
+    RightLegID INT,
+    LeftLegID INT
+    -- PRIMARY KEY (UserID, SponsorID),
+    -- FOREIGN KEY (UserID) REFERENCES Users(UserID) ON DELETE CASCADE,
+    -- FOREIGN KEY (SponsorID) REFERENCES Users(UserID) ON DELETE CASCADE
+);
+
+-- Table: Commissions
+CREATE TABLE Commissions (
+    CommissionID INT PRIMARY KEY AUTO_INCREMENT,
+    UserID INT,
+    OrderID INT, -- Link to the order that generated this commission
+    CommissionType ENUM('personal_sales', 'binary_bonus', 'override_bonus') NOT NULL,
+    Amount DECIMAL(10, 2) NOT NULL,
+    CommissionDate DATETIME DEFAULT CURRENT_TIMESTAMP
+    -- FOREIGN KEY (UserID) REFERENCES Users(UserID) ON DELETE CASCADE,
+    -- FOREIGN KEY (OrderID) REFERENCES Orders(OrderID) ON DELETE SET NULL -- If the order is deleted, we keep the commission record but remove the order reference
+);
+
+-- Table: Wallets
+CREATE TABLE Wallets (
+    WalletID INT PRIMARY KEY AUTO_INCREMENT,
+    UserID INT NOT NULL,
+    Balance DECIMAL(18, 2) NOT NULL DEFAULT 0.00,
+    Currency VARCHAR(3) NOT NULL DEFAULT 'USD', -- Assuming USD as default currency, this can be changed based on the system requirements
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (UserID) REFERENCES Users(UserID) ON DELETE CASCADE
+);
+
+-- Table: PayoutHistory
+CREATE TABLE PayoutHistory (
+    PayoutID INT PRIMARY KEY AUTO_INCREMENT,
+    UserID INT,
+    AccountID INT,
+    PayoutAmount DECIMAL(10, 2) NOT NULL,
+    PayoutDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PayoutType ENUM('approved', 'pending', 'failed') DEFAULT 'pending'
+    -- FOREIGN KEY (UserID) REFERENCES Users(UserID) ON DELETE CASCADE
+);
+
+-- Table: UsersBankAccount
+CREATE TABLE BankAcount (
+    RegistrationID INT PRIMARY KEY AUTO_INCREMENT,
+    UserID INT NOT NULL,
+    AccountNumber VARCHAR(255) UNIQUE NOT NULL,
+    AccountName VARCHAR(255) NOT NULL,
+    BankName VARCHAR(200) NOT NULL,
+    RegistrationDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    LastUpdated DATETIME ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    -- FOREIGN KEY (UserID) REFERENCES Users(UserID) ON DELETE CASCADE
+);
+
+-- Table: BinaryVolume
+CREATE TABLE BinaryVolume (
+    VolumeID INT PRIMARY KEY AUTO_INCREMENT,
+    UserID INT,
+    LeftVolume DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    RightVolume DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    VolumeDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (UserID) REFERENCES Users(UserID) ON DELETE CASCADE
+);
+
+-- Truncate the table
+TRUNCATE TABLE Tablename;
+
+-- Reset the auto-increment value
+ALTER TABLE Tablename AUTO_INCREMENT = 1;
+
+
+code for smtp
+ptkx xiig xrdw uydv

@@ -1,0 +1,91 @@
+<?php
+    require_once "Resources/dashboard_nav.php";
+?>
+    <style>
+    .tree-container ul {
+        list-style-type: none;
+    }
+
+    .tree-container ul ul {
+        margin-left: 20px;
+    }
+
+    .tree-container li {
+        margin-bottom: 10px;
+    }
+
+    </style>
+    <main>
+        <h1>Hello</h1>
+        <?php
+            // Display dashboard content
+            echo "<h2>Welcome to the Dashboard!</h2>";
+            echo "<p>User ID: " . $_SESSION['user_id'] . "</p>";
+        ?>
+        <?php
+        // Function to recursively build the network tree
+        function buildNetworkTree($conn, $userID) {
+            $tree = array();
+            // Query to fetch the direct children of the current user
+            $query = "SELECT UserID, FirstName, LastName FROM Users WHERE SponsorID = ?";
+            $stmt = $conn->prepare($query);
+            $stmt->bind_param("i", $userID);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                // Recursively build the tree for each child
+                $row['children'] = buildNetworkTree($conn, $row['UserID']);
+                $tree[] = $row;
+            }
+            return $tree;
+        }
+
+        // Check the connection
+        if ($conn->connect_error) {
+            die("Connection failed: " . $conn->connect_error);
+        }
+
+        // Call the function to build the network tree starting from the root user
+        $rootUserID = 1; // Change this to the desired root user ID
+        $networkTree = buildNetworkTree($conn, $rootUserID);
+
+        // Close the database connection
+        $conn->close();
+
+        // Output the network tree (you can format it as needed)
+        $json_data =  json_encode($networkTree);
+        ?>
+
+        <div class="tree-container" id="tree-container">
+        </div>
+        <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            // Sample JSON data (replace with actual JSON data from PHP response)
+            const jsonData = <?php echo $json_data; ?>;
+            
+            // Function to recursively generate HTML for the tree nodes
+            function generateTreeHTML(data) {
+                let html = '';
+                if (data.length > 0) {
+                    html += '<ul>';
+                    data.forEach(node => {
+                        html += `<li>${node.FirstName} ${node.LastName}`;
+                        html += generateTreeHTML(node.children);
+                        html += `</li>`;
+                    });
+                    html += '</ul>';
+                }
+                return html;
+            }
+
+            // Get the container element
+            const container = document.getElementById('tree-container');
+            // Generate the HTML for the tree
+            container.innerHTML = generateTreeHTML(jsonData);
+        });
+        </script>
+    </main>
+
+</section>
+</body>
+</html>

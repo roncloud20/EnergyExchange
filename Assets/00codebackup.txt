@@ -1,0 +1,517 @@
+// Create Product Page
+<?php
+    $pagetitle = "Create New Product";
+    require_once "Resources/dashboard_nav.php";
+?>
+
+<?php
+    // Include database connection
+    require_once "Resources/db_connect.php";
+
+    $msg = "";
+
+    // Check if the form is submitted
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        // Get form data
+        $productName = $_POST['ProductName'];
+        $productPicture = $_FILES['ProductPicture'];
+        $quantity = $_POST['Quantity'];
+        $unitOfMeasure = $_POST['UnitOfMeasure'];
+        $description = $_POST['Description'];
+        $costPrice = $_POST['CostPrice'];
+        $sellingPrice = $_POST['SellingPrice'];
+        $category = $_POST['Category'];
+
+        // Check if a file is uploaded
+        if (!empty($productPicture['name'])) {
+            // Code to handle the uploaded image
+            $targetDirectory = "product_dp/";
+
+            // Construct a unique filename based on product name and a unique number
+            $uniqueNumber = uniqid();
+            $targetFile = $targetDirectory . $productName . '_' . $uniqueNumber . '.' . pathinfo($_FILES['ProductPicture']['name'], PATHINFO_EXTENSION);
+
+            $uploadOk = 1;
+            $imageFileType = strtolower(pathinfo($targetFile, PATHINFO_EXTENSION));
+
+            // Validate file type (you can add more validation if needed)
+            if ($imageFileType != "jpg" && $imageFileType != "png" && $imageFileType != "jpeg") {
+                $dperr = "Invalid file type. Only JPG, JPEG, and PNG files are allowed.";
+                $uploadOk = 0;
+            }
+        } else {
+            // Use default image (brand logo) if no file is uploaded
+            $uploadOk = 0;
+            $defaultImageURL = "product_dp/default.png";
+            $targetFile = $defaultImageURL;
+        }
+
+
+        // Prepare and bind the SQL statement
+        $sql = "INSERT INTO Products (ProductName, ProductPicture, Quantity, UnitOfMeasure, Description, CostPrice, SellingPrice, QuantityBalance, Category) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ssdssddds", $productName, $targetFile, $quantity, $unitOfMeasure, $description, $costPrice, $sellingPrice, $quantity, $category);
+
+        // Execute the statement
+        if ($stmt->execute()) {
+            // Check if file upload is successful
+            if ($uploadOk == 1) {
+                move_uploaded_file($_FILES['ProductPicture']['tmp_name'], $targetFile);
+                // $dpURL = $targetFile;
+            }
+            // Product inserted successfully
+            $msg = "<h2>Product inserted successfully.</h2>";
+        } else {
+            // Error occurred
+            echo "<p>Error: " . $conn->error . "</p>";
+        }
+
+        // Close the statement
+        $stmt->close();
+    }
+
+    // Close the database connection
+    $conn->close();
+?>
+
+
+<!-- <main> -->
+    <div class="container">
+        <?= $msg ?>
+        <h2>Product Entry Form</h2>
+        <form action="" method="POST" enctype="multipart/form-data">
+            <input type="file" id="image-file" name="ProductPicture" accept="image/x-png, image/jpeg" style="display: none"/>
+            <label id="image-label" for="image-file">Upload image</label>
+            <script>
+                const input_file = document.getElementById('image-file');
+                const input_label = document.getElementById('image-label');
+                
+                const convert_to_base64 = file => new Promise((resolve) => {
+                    const file_reader = new FileReader();
+                    file_reader.readAsDataURL(file);
+                    file_reader.onload = () => resolve(file_reader.result);
+                });
+                
+                input_file.addEventListener('change', async function () {
+                    const file = this.files[0];  // Use 'this.files[0]' to directly access the first file
+                    const my_image = await convert_to_base64(file);
+                    
+                    // Set background image
+                    input_label.style.backgroundImage = `url(${my_image})`;
+                    
+                    // Update label text (optional)
+                    input_label.innerText = `Image: ${file.name}`;
+                });
+            </script>
+
+            <input type="text" id="ProductName" name="ProductName" placeholder="Product Name: " required><br>
+
+            <input type="number" id="Quantity" name="Quantity" step="0.01" placeholder="Quantity: " required><br>
+
+            <label for="UnitOfMeasure">Unit of Measure:</label><br>
+            <select id="UnitOfMeasure" name="UnitOfMeasure" required>
+                <option value="bbl">Barrel (bbl)</option>
+                <option value="scf">Standard Cubic Feet (scf)</option>
+                <option value="m3">Cubic Meter (m³)</option>
+            </select><br>
+
+            <!-- <label for="Description">Description:</label><br> -->
+            <textarea id="Description" name="Description" placeholder="Description: "></textarea><br>
+
+            <input type="number" id="CostPrice" name="CostPrice" step="0.01" placeholder="Cost Price: " required><br>
+
+            <input type="number" id="SellingPrice" name="SellingPrice" step="0.01" placeholder="Selling Price" required><br>
+
+            <label for="Category">Category:</label><br>
+            <select id="Category" name="Category">
+                <option value="oil" selected>Oil</option>
+                <option value="gas">Gas</option>
+            </select>
+
+            <input type="submit" value="Submit">
+        </form>
+    </div>
+</main>
+</section>
+
+
+
+//////// checkout.php
+<?php
+    $pagetitle = "Checkout";
+    // Including the dashboards navigation bar
+    require_once "Resources/dashboard_nav.php";
+
+    // Include database connection
+    require_once "Resources/db_connect.php";
+
+    // Check if session is started
+    if (session_status() == PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    // Check if user is logged in
+    if(isset($_SESSION['user_id'])) {
+        // Fetch user's cart items from the OrderDetails table
+        $userID = $_SESSION['user_id'];
+        $sql = "SELECT od.OrderDetailID, od.ProductID, p.ProductName, p.ProductPicture, od.Quantity, p.SellingPrice, od.Subtotal, p.QuantityBalance
+                FROM OrderDetails od
+                INNER JOIN Products p ON od.ProductID = p.ProductID
+                WHERE od.OrderID = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("i", $userID);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        // Display cart items and total amount
+        if ($result->num_rows > 0) {
+            ?>
+            <div class='checkout-items'>
+                <h2>Review Your Order</h2>
+                <form action="process_payment.php" method="post">
+                    <table>
+                        <tr>
+                            <th>Product</th>
+                            <th>Quantity</th>
+                            <th>Price</th>
+                            <th>Subtotal</th>
+                        </tr>
+                        <?php
+                        $totalAmount = 0;
+                        while($row = $result->fetch_assoc()) {
+                            $totalAmount += $row["Subtotal"];
+                            ?>
+                            <tr>
+                                <td><?php echo $row["ProductName"]; ?></td>
+                                <td><?php echo $row["Quantity"]; ?></td>
+                                <td>$<?php echo number_format($row["SellingPrice"], 2); ?></td>
+                                <td>$<?php echo number_format($row["Subtotal"], 2); ?></td>
+                            </tr>
+                            <?php
+                        }
+                        ?>
+                        <tr>
+                            <td colspan="3"><strong>Total:</strong></td>
+                            <td>$<?php echo number_format($totalAmount, 2); ?></td>
+                        </tr>
+                    </table>
+                    <!-- Payment form fields (e.g., credit card info) can be added here -->
+                    <input type="hidden" name="total_amount" value="<?php echo $totalAmount; ?>">
+                    <button type="submit">Proceed to Payment</button>
+                </form>
+            </div>
+            <?php
+        } else {
+            echo "<p>Your cart is empty</p>";
+        }
+    } else {
+        echo "<p>Please log in to proceed to checkout</p>";
+    }
+
+    // Close connection
+    $conn->close();
+?>
+
+// view_cart.php
+<?php
+    $pagetitle = "View Cart";
+    // Including the dashboards navigation bar
+    require_once "Resources/dashboard_nav.php";
+
+    // Include database connection
+    require_once "Resources/db_connect.php";
+
+    // Check if session is started
+    if (session_status() == PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // $sellingPrice = "";
+    // Check if user is logged in and has an active order
+    if(isset($_SESSION['user_id']) ) {
+        $orderID = $userID = $_SESSION['user_id'];
+        // $orderID = $_SESSION['order_id'];
+
+        // Check if form is submitted for updating quantity or removing item
+        if ($_SERVER["REQUEST_METHOD"] == "POST") {
+            if (isset($_POST['update_quantity'])) {
+                // Update quantity of the item in the cart
+                $orderDetailID = $_POST['order_detail_id'];
+                $quantity = $_POST['quantity'];
+
+                $updateSql = "UPDATE OrderDetails SET Quantity = ? WHERE OrderDetailID = ?";
+                $updateStmt = $conn->prepare($updateSql);
+                $updateStmt->bind_param("ii", $quantity, $orderDetailID);
+                $updateStmt->execute();
+
+                // Recalculate subtotal after updating quantity
+                $subtotalSql = "SELECT Quantity, SellingPrice, Subtotal FROM OrderDetails WHERE OrderDetailID = ?";
+                $subtotalStmt = $conn->prepare($subtotalSql);
+                $subtotalStmt->bind_param("i", $orderDetailID);
+                $subtotalStmt->execute();
+                $subtotalResult = $subtotalStmt->get_result();
+
+                if ($subtotalResult->num_rows == 1) {
+                    $subtotalRow = $subtotalResult->fetch_assoc();
+                    $subtotal = $subtotalRow["SellingPrice"] * $subtotalRow["Quantity"];
+                    // $subtotal = $_POST['new_subtotal'];
+                    // $subtotal = $subtotalRow["Quantity"] * $subtotalRow["Subtotal"];
+
+                    // Update subtotal in the database
+                    $updateSubtotalSql = "UPDATE OrderDetails SET Subtotal = ? WHERE OrderDetailID = ?";
+                    $updateSubtotalStmt = $conn->prepare($updateSubtotalSql);
+                    $updateSubtotalStmt->bind_param("di", $subtotal, $orderDetailID);
+                    $updateSubtotalStmt->execute();
+                }
+            } elseif (isset($_POST['remove_item'])) {
+                // Remove item from the cart
+                $orderDetailID = $_POST['order_detail_id'];
+
+                $deleteSql = "DELETE FROM OrderDetails WHERE OrderDetailID = ?";
+                $deleteStmt = $conn->prepare($deleteSql);
+                $deleteStmt->bind_param("i", $orderDetailID);
+                $deleteStmt->execute();
+            }
+        }
+
+        // Query to fetch cart items from OrderDetails table
+        $sql = "SELECT od.OrderDetailID, od.ProductID, p.ProductName, p.ProductPicture, od.Quantity, p.SellingPrice, od.Subtotal, p.QuantityBalance
+                FROM OrderDetails od
+                INNER JOIN Products p ON od.ProductID = p.ProductID
+                WHERE od.OrderID = ? AND od.orderStatus ='Pending'";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("i", $orderID);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        // Display cart items
+        if ($result->num_rows > 0) {
+?>
+            <div class='cart-items'>
+                <h2>Your Cart</h2>
+<?php
+                $total = 0; // Initialize total variable
+
+                while($row = $result->fetch_assoc()) {
+                    $subtotal = $row["Quantity"] * $row["SellingPrice"]; // Calculate subtotal
+?>
+                    <div class='cart-item'>
+                        <div class="item-name">
+                            <img src='<?php echo $row["ProductPicture"]; ?>' alt='<?php echo $row["ProductName"]; ?>'>
+                            <h3><?php echo $row["ProductName"]; ?></h3>
+                        </div>
+                        <div class='cart-item-content'>
+                            <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
+                                <input type="hidden" name="order_detail_id" value="<?php echo $row["OrderDetailID"]; ?>">
+                                <label for="quantity">Quantity:</label>
+                                <input type="number" id="quantity" name="quantity" value="<?php echo $row["Quantity"]; ?>" min="1" max="<?= $row["QuantityBalance"]?>" required>
+                                <button type="submit" name="update_quantity">Update</button>
+                            </form>
+                            <h3>Subtotal: $<?php echo number_format($subtotal, 2, '.', ','); ?></h3>
+                            <?php $sellingPrice = $row["SellingPrice"]; ?>
+                            <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
+                                <input type="hidden" name="order_detail_id" value="<?php echo $row["OrderDetailID"]; ?>">
+                                <button type="submit" name="remove_item">Remove &#x1F5D1;</button>
+                            </form>
+                            
+                        </div>
+                    </div>
+<?php
+                    $total += $subtotal; // Add subtotal to total
+                }
+?>
+                <p>Total: $<?php echo number_format($total, 2, '.', ','); ?></p>
+                <!-- <a href="checkout.php">checkout</a> -->
+                <a href="delivery_selection.php" class="button">Select Delivery</a>
+            </div>
+<?php
+        } else {
+            echo "<p>Your cart is empty</p>";
+        }
+    } else {
+        echo "<p>Please log in to view your cart</p>";
+    }
+
+    // Close connection
+    $conn->close();
+?>
+
+
+--- Processing Payment
+<?php
+    $pagetitle = "Payment Processing";
+    // Including the dashboards navigation bar
+    require_once "Resources/dashboard_nav.php";
+
+    // Check if session is started
+    if (session_status() == PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    // Check if user is logged in
+    if(isset($_SESSION['user_id'])) {
+        // Check if the form is submitted
+        if ($_SERVER["REQUEST_METHOD"] == "POST") {
+            // Retrieve user ID from session
+            $userID = $_SESSION['user_id'];
+
+            // Selecting Location
+            $_SESSION['location_id'] = $_POST['location_id'];
+            $locationID = $_SESSION['location_id'];
+
+            // Debugging: Display location ID
+            echo "Location ID: " . $locationID . "<br>";
+
+            // Insert new order into Orders table
+            $_SESSION['total_amount'] = $_POST['total_amount'];
+            $totalAmount = $_SESSION['total_amount'];
+
+            // Debugging: Display total amount
+            echo "Total Amount: " . $totalAmount . "<br>";
+
+            // Check which button is clicked
+            if(isset($_POST['payment_success'])) {
+                // Redirect to payment success page
+                $_SESSION['total_amount'] = $totalAmount; // Update total amount in session
+                $_SESSION['location_id'] = $locationID; // Update location ID in session
+                header("Location: payment_success.php");
+                exit(); // Ensure script termination after redirection
+            } elseif (isset($_POST['payment_failed'])) {
+                // Process failed payment
+                echo "<h2>Payment Failed. Please try again.</h2>";
+            }
+        } else {
+            // Redirect to checkout page if no form submission
+            header("Location: checkout.php");
+            exit();
+        }
+    } else {
+        echo "<p>Please log in to proceed with the payment processing.</p>";
+    }
+?>
+<div class="payment-processing">
+    <h2>Payment Processing</h2>
+    <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
+        <!-- Hidden input fields for location ID and total amount -->
+        <input type="hidden" name="location_id" value="<?php echo $locationID; ?>">
+        <input type="hidden" name="total_amount" value="<?php echo $totalAmount; ?>">
+        <!-- Buttons for payment success and failure -->
+        <button type="submit" name="payment_success">Successful Payment</button>
+        <button type="submit" name="payment_failed">Failed Payment</button>
+    </form>
+</div>
+
+
+--- checkout page
+<?php
+$pagetitle = "Checkout";
+// Including the dashboards navigation bar
+require_once "Resources/dashboard_nav.php";
+
+// Include database connection
+require_once "Resources/db_connect.php";
+
+// Check if session is started
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Check if user is logged in
+if(isset($_SESSION['user_id'])) {
+    // Fetch user's cart items from the OrderDetails table
+    $userID = $_SESSION['user_id'];
+    $sql = "SELECT od.OrderDetailID, od.ProductID, p.ProductName, p.ProductPicture, od.Quantity, p.SellingPrice, od.Subtotal, p.QuantityBalance
+            FROM OrderDetails od
+            INNER JOIN Products p ON od.ProductID = p.ProductID
+            WHERE od.OrderID = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $userID);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    // Display cart items and total amount
+    if ($result->num_rows > 0) {
+        ?>
+        <div class='checkout-items'>
+            <h2>Review Your Order</h2>
+            <form action="process_payment.php" method="post">
+                <table>
+                    <tr>
+                        <th>Product</th>
+                        <th>Quantity</th>
+                        <th>Price</th>
+                        <th>Subtotal</th>
+                    </tr>
+                    <?php
+                    $totalAmount = 0;
+                    while($row = $result->fetch_assoc()) {
+                        $totalAmount += $row["Subtotal"];
+                        ?>
+                        <tr>
+                            <td><?php echo $row["ProductName"]; ?></td>
+                            <td><?php echo $row["Quantity"]; ?></td>
+                            <td>$<?php echo number_format($row["SellingPrice"], 2); ?></td>
+                            <td>$<?php echo number_format($row["Subtotal"], 2); ?></td>
+                        </tr>
+                        <?php
+                    }
+                    ?>
+                    <tr>
+                        <td colspan="3"><strong>Total:</strong></td>
+                        <td>$<?php echo number_format($totalAmount, 2); ?></td>
+                    </tr>
+                </table>
+                <?php
+                // Fetch user's delivery locations from the DeliveryLocations table
+                $sql_delivery = "SELECT * FROM DeliveryLocations WHERE UserID = ?";
+                $stmt_delivery = $conn->prepare($sql_delivery);
+                $stmt_delivery->bind_param("i", $userID);
+                $stmt_delivery->execute();
+                $result_delivery = $stmt_delivery->get_result();
+
+                // Display delivery locations
+                if ($result_delivery->num_rows > 0) {
+                    ?>
+                    <div class='delivery-locations'>
+                        <h2>Select Delivery Location</h2>
+                        <?php
+                        echo "<a href='delivery_registration.php'>Register Delivery Location</a>";
+                        while($row = $result_delivery->fetch_assoc()) {
+                            ?>
+                            <div class="location">
+                                <label>
+                                    <input type="radio" name="location_id" value="<?php echo $row['LocationID']; ?>" required>
+                                    <strong><?php echo $row["CompanyName"]; ?></strong><br>
+                                    <?php echo $row["Address"] . ", " . $row["City"] . ", " . $row["State"] . ", " . $row["Country"] . ", " . $row["PostalCode"]; ?><br>
+                                    Contact: <?php echo $row["ContactName"] . " (" . $row["ContactNumber"] . ")"; ?>
+                                </label>
+                            </div>
+                            <?php
+                        }
+                        ?>
+                        <!-- Include total amount as a hidden input field -->
+                        <input type="hidden" name="total_amount" value="<?php echo $totalAmount; ?>">
+                        <button type="submit">Continue to Checkout</button>
+                    </div>
+                    <?php
+                } else {
+                    echo "<p>No delivery locations found. Please register a delivery location <a href='delivery_registration.php'>here</a>.</p>";
+                }
+                ?>
+                <!-- Payment form fields (e.g., credit card info) can be added here -->
+                
+                <!-- <button type="submit">Proceed to Payment</button> -->
+            </form>
+        </div>
+        <?php
+    } else {
+        echo "<p>Your cart is empty</p>";
+    }
+} else {
+    echo "<p>Please log in to proceed to checkout</p>";
+}
+
+// Close connection
+$conn->close();
+?>
